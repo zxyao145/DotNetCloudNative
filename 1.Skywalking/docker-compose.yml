@@ -1,0 +1,54 @@
+version: '3.3'
+services:
+  elasticsearch:
+    image: elasticsearch:8.3.1
+    container_name: elasticsearch
+    ports:
+      - "9200:9200" 
+      - "9300:9300"
+    volumes:
+      - ./data/elasticsearch/data:/usr/share/elasticsearch/data
+      - ./data/elasticsearch/logs:/usr/share/elasticsearch/logs
+    environment:
+      - TZ=Asia/Shanghai
+      - discovery.type=single-node
+      - cluster.name=docker-cluster
+      - node.name=es-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms128m -Xmx1024m"
+
+  skywalking-oap:
+    image: apache/skywalking-oap-server:9.1.0
+    container_name: skywalking-oap
+    # volumes:
+    #   - /home/vol/skywalking/config/alarm-settings.yml:/skywalking/config/alarm-settings.yml
+    ports:
+      - "11800:11800"
+      - "12800:12800"
+      - "1234:1234"
+    depends_on:
+      - elasticsearch
+    links:
+      - elasticsearch:es
+    environment:
+      - TZ=Asia/Shanghai
+      - SW_STORAGE=elasticsearch
+      - SW_STORAGE_ES_CLUSTER_NODES=es:9200
+    healthcheck:
+      test: ["CMD", "curl", "http://es:9200"]
+      interval: 2s
+      timeout: 30s
+      retries: 30
+      start_period: 30s
+  skywalking-ui:
+    image: apache/skywalking-ui:9.1.0
+    container_name: skywalking-ui
+    depends_on:
+      - skywalking-oap
+    links:
+      - skywalking-oap:oap
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Shanghai
+      SW_OAP_ADDRESS: http://oap:12800
